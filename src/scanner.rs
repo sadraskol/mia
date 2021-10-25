@@ -1,3 +1,5 @@
+use crate::token::Token;
+use crate::token::TokenType;
 use std::str::Chars;
 
 pub struct Scanner<'a> {
@@ -17,11 +19,11 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    pub fn scan_token(&mut self) -> Token<'a> {
+    pub fn scan_token(&mut self, debug: bool) -> Token<'a> {
         self.skip_whitespace();
         self.current = self.iter.as_str();
         self.offset = 0;
-        if let Some(c) = self.advance() {
+        let t = if let Some(c) = self.advance() {
             if c.is_alphabetic() || c == '_' {
                 return self.identifier();
             }
@@ -44,7 +46,13 @@ impl<'a> Scanner<'a> {
             }
         } else {
             self.make_token(TokenType::Eof)
+        };
+
+        if debug {
+            println!("[Scanner] {:?}", t);
         }
+
+        t
     }
 
     fn skip_whitespace(&mut self) {
@@ -98,9 +106,11 @@ impl<'a> Scanner<'a> {
     }
 
     fn identifier(&mut self) -> Token<'a> {
-        while self.peek()
+        while self
+            .peek()
             .map(|c| c.is_alphanumeric() || c == '_' || c.is_numeric())
-            .unwrap_or(false) {
+            .unwrap_or(false)
+        {
             self.advance();
         }
         self.make_token(TokenType::Identifier)
@@ -156,25 +166,4 @@ impl<'a> Scanner<'a> {
             line: self.line,
         }
     }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct Token<'a> {
-    pub kind: TokenType,
-    pub lexeme: &'a str,
-    pub line: usize,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum TokenType {
-    RightBracket,
-    LeftBracket,
-    Identifier,
-    Number,
-    String,
-    Process,
-    Equal,
-    NewLine,
-    Eof,
-    Error
 }

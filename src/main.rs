@@ -1,8 +1,9 @@
-use crate::parser::TokenType;
-use crate::parser::Scanner;
+use crate::scanner::Scanner;
+use crate::token::TokenType;
 use std::env::args;
 
-mod parser;
+mod scanner;
+mod token;
 
 fn main() {
     let mut args = args();
@@ -15,11 +16,10 @@ fn run_file(f: String) {
     let mut scanner = Scanner::init(&source);
 
     loop {
-        let t = scanner.scan_token();
+        let t = scanner.scan_token(true);
 
         if t.kind == TokenType::Eof {
             break;
         }
-        println!("{:?}", t);
     }
 }
