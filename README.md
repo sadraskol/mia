@@ -30,7 +30,7 @@ p.o # is the output of the process, of type Stream
 p?.o # is the output of the process, of type String
 ```
 
-### Types
+## Types
 
 - `String`
 - `Process`
@@ -39,17 +39,33 @@ p?.o # is the output of the process, of type String
 - `Num`
 - `Completable<T>`
 
-### Operators
+## Operators
 
 `.` calls a method like `"nAmE".uppercase`.
 
-`?.` is a special characters that allows to manipulate `T` instead of `Completable<T>`
+`?` is a special characters that turns a completable of `T` into `T`.
+This is very useful to manipulate strings instead of pointers.
 
-### Process
+```mia
+var files = `ls`?.o.words() // or `ls`.o?.words() or `ls`.o.words()?
+for f in files {
+  `stat $f`
+}
+```
 
-`o` regular output as a `Completable<String>`
+## Process and TerminatedProcess
 
-`e` error output as a `Completable<String>`
+| Method | Description | `Process` | `TerminatedProcess` |
+| --- | --- | --- | --- |
+| `o` | Pointer to the standard output | `Completable<String>` | `String` |
+| `e` | Pointer to the error output | `Completable<String>` | `String` |
+| `status_code` | status of the process | `Completable<Num>` | `Num` |
+| `pid` | pid of the corresponding process | `Num` | `Num` |
+| `ppid` | parent process id | `Num` | `Num ` |
 
-`status_code` status code as a `Completable<Num>`
+## String methods
 
+| Method | Description |
+| --- | --- |
+| `words` | Split the string in words of either list of chars or single quoted strings |
+| `lines` | Split the string in lines |

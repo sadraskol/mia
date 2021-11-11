@@ -34,7 +34,11 @@ impl<'a> Scanner<'a> {
             match c {
                 '[' => self.make_token(TokenType::LeftBracket),
                 ']' => self.make_token(TokenType::RightBracket),
+                '(' => self.make_token(TokenType::LeftParen),
+                ')' => self.make_token(TokenType::RightParen),
                 '=' => self.make_token(TokenType::Equal),
+                '.' => self.make_token(TokenType::Dot),
+                '?' => self.make_token(TokenType::Question),
                 '\n' => {
                     let t = self.make_token(TokenType::NewLine);
                     self.line += 1;
@@ -113,7 +117,18 @@ impl<'a> Scanner<'a> {
         {
             self.advance();
         }
-        self.make_token(TokenType::Identifier)
+        self.make_token(self.token_type())
+    }
+
+    fn token_type(&self) -> TokenType {
+        match self.current[] {
+            'i' => {
+                if self.iter.peek_next() {
+
+                }
+            }
+            _ => TokenType::Identifier
+        }
     }
 
     fn number(&mut self) -> Token<'a> {
