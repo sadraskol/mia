@@ -7,6 +7,8 @@ pub struct Scanner<'a> {
     current: &'a str,
     offset: usize,
     line: usize,
+    col: usize,
+    col_offset: usize,
 }
 
 impl<'a> Scanner<'a> {
@@ -16,6 +18,8 @@ impl<'a> Scanner<'a> {
             current: source,
             offset: 0,
             line: 1,
+            col: 1,
+            col_offset: 1,
         }
     }
 
@@ -25,28 +29,36 @@ impl<'a> Scanner<'a> {
         self.offset = 0;
         let t = if let Some(c) = self.advance() {
             if c.is_alphabetic() || c == '_' {
-                return self.identifier();
-            }
-            if c.is_numeric() {
-                return self.number();
-            }
-
-            match c {
-                '[' => self.make_token(TokenType::LeftBracket),
-                ']' => self.make_token(TokenType::RightBracket),
-                '(' => self.make_token(TokenType::LeftParen),
-                ')' => self.make_token(TokenType::RightParen),
-                '=' => self.make_token(TokenType::Equal),
-                '.' => self.make_token(TokenType::Dot),
-                '?' => self.make_token(TokenType::Question),
-                '\n' => {
-                    let t = self.make_token(TokenType::NewLine);
-                    self.line += 1;
-                    t
+                self.identifier()
+            } else if c.is_numeric() {
+                self.number()
+            } else {
+                match c {
+                    '[' => self.make_token(TokenType::LeftBracket),
+                    ']' => self.make_token(TokenType::RightBracket),
+                    '(' => self.make_token(TokenType::LeftParen),
+                    ')' => self.make_token(TokenType::RightParen),
+                    '{' => self.make_token(TokenType::LeftBrace),
+                    '}' => self.make_token(TokenType::RightBrace),
+                    '<' => self.make_token(TokenType::LeftCaret),
+                    '>' => self.make_token(TokenType::RightCaret),
+                    '=' => self.make_token(TokenType::Equal),
+                    '&' => self.make_token(TokenType::Ampersand),
+                    '+' => self.make_token(TokenType::Plus),
+                    '-' => self.make_token(TokenType::Minus),
+                    '*' => self.make_token(TokenType::Star),
+                    '/' => self.make_token(TokenType::Slash),
+                    '.' => self.make_token(TokenType::Dot),
+                    ';' => self.make_token(TokenType::Semicolon),
+                    ',' => self.make_token(TokenType::Comma),
+                    ':' => self.make_token(TokenType::Colon),
+                    '?' => self.make_token(TokenType::Question),
+                    '\'' => self.string(),
+                    _ => {
+                        eprintln!("Unexpected character at line {}: {}", self.line, c);
+                        self.error_token("Unexpected character.")
+                    },
                 }
-                '"' => self.string(),
-                '`' => self.process(),
-                _ => self.error_token("Unexpected character."),
             }
         } else {
             self.make_token(TokenType::Eof)
@@ -62,7 +74,11 @@ impl<'a> Scanner<'a> {
     fn skip_whitespace(&mut self) {
         loop {
             if let Some(c) = self.peek() {
-                if c != '\n' && c.is_whitespace() {
+                if c.is_whitespace() {
+                    if c == '\n' {
+                        self.line += 1;
+                        self.col_offset = 1;
+                    }
                     self.advance();
                 } else if c == '#' {
                     while self.peek() != Some('\n') {
@@ -77,26 +93,11 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn process(&mut self) -> Token<'a> {
-        while self.peek() != Some('`') {
-            if self.peek() == Some('\n') {
-                self.line += 1;
-            }
-            self.advance();
-        }
-
-        if self.is_at_end() {
-            self.error_token("Unterminated process.")
-        } else {
-            self.advance();
-            self.make_token(TokenType::Process)
-        }
-    }
-
     fn string(&mut self) -> Token<'a> {
-        while self.peek() != Some('"') {
+        while self.peek() != Some('\'') {
             if self.peek() == Some('\n') {
                 self.line += 1;
+                self.col_offset = 1;
             }
             self.advance();
         }
@@ -121,14 +122,64 @@ impl<'a> Scanner<'a> {
     }
 
     fn token_type(&self) -> TokenType {
-        match self.current[] {
-            'i' => {
-                if self.iter.peek_next() {
-
+        if self.current.starts_with("export") {
+            TokenType::Export
+        } else {
+            let mut local_iter = self.current.chars();
+            match local_iter.next() {
+                Some('f') => {
+                    if Self::remaining(local_iter.as_str(), "or") {
+                        TokenType::For
+                    } else if Self::remaining(local_iter.as_str(), "rom") {
+                        TokenType::From
+                    } else {
+                        TokenType::Identifier
+                    }
                 }
+                Some('i') => {
+                    match local_iter.next() {
+                        Some('f') => TokenType::If,
+                        Some('n') => TokenType::In,
+                        Some('m') => if Self::remaining(local_iter.as_str(), "port") {
+                            TokenType::Import
+                        } else {
+                            TokenType::Identifier
+                        }
+                        _ => TokenType::Identifier
+                    }
+                }
+                Some('l') => {
+                    match local_iter.next() {
+                        Some('e') => {
+                            match local_iter.next() {
+                                Some('t') => TokenType::Let,
+                                _ => TokenType::Identifier
+                            }
+                        }
+                        _ => TokenType::Identifier
+                    }
+                }
+                Some('s') => {
+                    if Self::remaining(local_iter.as_str(), "truct") {
+                        TokenType::Struct
+                    } else {
+                        TokenType::Identifier
+                    }
+                }
+                Some(c) => {
+                    if c.is_uppercase() {
+                        TokenType::KIdentifier
+                    } else {
+                        TokenType::Identifier
+                    }
+                }
+                _ => TokenType::Identifier
             }
-            _ => TokenType::Identifier
         }
+    }
+
+    fn remaining(iter: &str, remain: &str) -> bool  {
+        iter.starts_with(remain)
     }
 
     fn number(&mut self) -> Token<'a> {
@@ -148,6 +199,7 @@ impl<'a> Scanner<'a> {
 
     fn advance(&mut self) -> Option<char> {
         let c = self.iter.next();
+        self.col_offset += 1;
         self.offset += c.map(|c| c.len_utf8()).unwrap_or(0);
         c
     }
@@ -166,19 +218,25 @@ impl<'a> Scanner<'a> {
         self.current == ""
     }
 
-    fn make_token(&self, kind: TokenType) -> Token<'a> {
-        Token {
+    fn make_token(&mut self, kind: TokenType) -> Token<'a> {
+        let t = Token {
             kind,
             lexeme: &self.current[0..self.offset],
             line: self.line,
-        }
+            col: self.col,
+        };
+        self.col = self.col_offset;
+        t
     }
 
-    fn error_token(&self, msg: &'a str) -> Token<'a> {
-        Token {
+    fn error_token(&mut self, msg: &'a str) -> Token<'a> {
+        let t = Token {
             kind: TokenType::Error,
             lexeme: msg,
             line: self.line,
-        }
+            col: self.col,
+        };
+        self.col = self.col_offset;
+        t
     }
 }
