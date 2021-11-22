@@ -7,11 +7,13 @@ struct Kube {
     opt: Number?,
 }
 
-fn kube(name: String, hello: String) -> Kube {
-    Kube {
-        name.super: name,
-        comment: hello
-    }
-}
-
 export Kube;
+
+let ratio = 0.34;
+
+export init = Kube {
+    name.super: 'Some name',
+    comment: 'Comment',
+    tags: [],
+    opt: 123 * ratio
+};
