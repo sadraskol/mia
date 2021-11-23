@@ -9,10 +9,11 @@ pub struct Scanner<'a> {
     line: usize,
     col: usize,
     col_offset: usize,
+    debug: bool,
 }
 
 impl<'a> Scanner<'a> {
-    pub fn init(source: &'a str) -> Self {
+    pub fn init(source: &'a str, debug: bool) -> Self {
         Scanner {
             iter: source.chars(),
             current: source,
@@ -20,10 +21,11 @@ impl<'a> Scanner<'a> {
             line: 1,
             col: 1,
             col_offset: 1,
+            debug,
         }
     }
 
-    pub fn scan_token(&mut self, debug: bool) -> Token<'a> {
+    pub fn scan_token(&mut self) -> Token<'a> {
         self.skip_whitespace();
         self.current = self.iter.as_str();
         self.offset = 0;
@@ -64,7 +66,7 @@ impl<'a> Scanner<'a> {
             self.make_token(TokenType::Eof)
         };
 
-        if debug {
+        if self.debug {
             println!("[Scanner] {:?}", t);
         }
 

@@ -1,4 +1,5 @@
 use crate::token::Token;
+use crate::{Scanner, TokenType};
 
 #[derive(Debug)]
 enum Object {
@@ -38,34 +39,68 @@ enum Statement<'a> {
 }
 
 #[derive(Debug)]
-struct Program<'a> {
-    declarations: Vec<Statement<'a>>
-}
+pub struct Program<'a>(Vec<Statement<'a>>);
 
 pub struct Parser<'a> {
-    program: Program<'a>,
-    current: Option<Token<'a>>,
+    scanner: Scanner<'a>,
+    previous: Token<'a>,
+    current: Token<'a>,
+    debug: bool,
 }
 
 impl<'a> Parser<'a> {
-    pub fn new() -> Self {
+    pub fn init(scanner: Scanner<'a>, debug: bool, previous: Token<'a>, current: Token<'a>) -> Self {
         Parser {
-            program: Program { declarations: vec![] },
-            current: None,
+            scanner,
+            previous,
+            current,
+            debug,
         }
     }
 
-    pub fn current(&self) -> Token<'a> {
-        self.current.unwrap()
+    pub fn parse(&mut self) -> Program {
+        self.program()
     }
 
-    pub fn parse(&mut self, tok: Token<'a>, debug: bool) {
-        self.current = Some(tok);
+    fn matches(&mut self, kind: TokenType) -> bool {
+        if self.current.kind == kind {
+            self.advance();
+            true
+        } else {
+            false
+        }
     }
 
-    pub fn ast(&self, debug: bool) {
-        if debug {
-            println!("[Parser]: {:?}", self.program);
+    fn advance(&mut self) {
+        self.previous = self.current;
+        self.current = self.scanner.scan_token();
+    }
+
+    fn program(&mut self) -> Program {
+        let mut stmts = vec![];
+        while self.current.kind != TokenType::Eof {
+            stmts.push(self.declaration())
+        }
+        Program(stmts)
+    }
+
+    fn declaration(&mut self) -> Statement {
+        if self.matches(TokenType::Let) {
+            self.let_declaration()
+        } else if self.matches(TokenType::Export) {
+            self.export_declaration()
+        } else if self.matches(TokenType::Import) {
+            self.import_declaration()
+        } else {
+            self.statement()
+        }
+    }
+
+    fn statement(&mut self) -> Statement {
+        if self.matches(TokenType::For) {
+            self.for_statement()
+        } else {
+            self.expr_statement()
         }
     }
 }

@@ -15,17 +15,12 @@ fn main() {
 
 fn run_file(f: String) {
     let source = std::fs::read_to_string(f).unwrap();
-    let mut scanner = Scanner::init(&source);
-    let mut parser = Parser::new();
 
-    loop {
-        let t = scanner.scan_token(true);
-        parser.parse(t, true);
+    let mut scanner = Scanner::init(&source, true);
 
-        if t.kind == TokenType::Eof {
-            break;
-        }
-    }
+    let previous = scanner.scan_token();
+    let current = scanner.scan_token();
+    let mut parser = Parser::init(scanner, true, previous, current);
 
-    parser.ast(true);
+    parser.parse();
 }
