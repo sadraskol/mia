@@ -77,17 +77,17 @@ impl<'a> Parser<'a> {
     }
 
     fn advance(&mut self) -> Token<'a> {
-        let previous = std::mem::replace(&mut self.current, self.scanner.scan_token());
-        if self.debug {
-            println!("[Parser] advancing to {}", self.current.lexeme);
-        }
-        previous
+        std::mem::replace(&mut self.current, self.scanner.scan_token())
     }
 
     fn program(&mut self) -> Program<'a> {
         let mut stmts = vec![];
         while self.current.kind != TokenType::Eof {
-            stmts.push(self.declaration());
+            let statement = self.declaration();
+            if self.debug {
+                println!("[Parser] parsed {:?}", statement);
+            }
+            stmts.push(statement);
         }
         Program(stmts)
     }
@@ -216,12 +216,22 @@ impl<'a> Parser<'a> {
     }
 
     fn expression(&mut self) -> Expr<'a> {
-        let expr = self.primary();
+        let expr = self.multiply();
         if self.matches(TokenType::Equal).is_some() {
             let value = self.expression();
             Expr::Assign(Box::new(expr), Box::new(value))
         } else {
             expr
+        }
+    }
+
+    fn multiply(&mut self) -> Expr<'a> {
+        let operand = self.primary();
+        if let Some(op) = self.matches(TokenType::Star) {
+            let value = self.expression();
+            Expr::Binary(Box::new(operand), op, Box::new(value))
+        } else {
+            operand
         }
     }
 
