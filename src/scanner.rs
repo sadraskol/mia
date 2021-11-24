@@ -59,7 +59,7 @@ impl<'a> Scanner<'a> {
                     _ => {
                         eprintln!("Unexpected character at line {}: {}", self.line, c);
                         self.error_token("Unexpected character.")
-                    },
+                    }
                 }
             }
         } else {
@@ -124,64 +124,58 @@ impl<'a> Scanner<'a> {
     }
 
     fn token_type(&self) -> TokenType {
-        if self.current.starts_with("export") {
-            TokenType::Export
-        } else {
-            let mut local_iter = self.current.chars();
-            match local_iter.next() {
-                Some('f') => {
-                    if Self::remaining(local_iter.as_str(), "or") {
-                        TokenType::For
-                    } else if Self::remaining(local_iter.as_str(), "rom") {
-                        TokenType::From
-                    } else {
-                        TokenType::Identifier
-                    }
+        let mut local_iter = self.current[0..self.offset].chars();
+        match local_iter.next() {
+            Some('f') => {
+                if local_iter.as_str() == "or" {
+                    TokenType::For
+                } else if local_iter.as_str() == "rom" {
+                    TokenType::From
+                } else {
+                    TokenType::Identifier
                 }
-                Some('i') => {
-                    match local_iter.next() {
-                        Some('f') => TokenType::If,
-                        Some('n') => TokenType::In,
-                        Some('m') => if Self::remaining(local_iter.as_str(), "port") {
-                            TokenType::Import
-                        } else {
-                            TokenType::Identifier
-                        }
-                        _ => TokenType::Identifier
-                    }
-                }
-                Some('l') => {
-                    match local_iter.next() {
-                        Some('e') => {
-                            match local_iter.next() {
-                                Some('t') => TokenType::Let,
-                                _ => TokenType::Identifier
-                            }
-                        }
-                        _ => TokenType::Identifier
-                    }
-                }
-                Some('s') => {
-                    if Self::remaining(local_iter.as_str(), "truct") {
-                        TokenType::Struct
-                    } else {
-                        TokenType::Identifier
-                    }
-                }
-                Some(c) => {
-                    if c.is_uppercase() {
-                        TokenType::KIdentifier
-                    } else {
-                        TokenType::Identifier
-                    }
-                }
-                _ => TokenType::Identifier
             }
+            Some('i') => {
+                if local_iter.as_str() == "f" {
+                    TokenType::If
+                } else if local_iter.as_str() == "n" {
+                    TokenType::In
+                } else if local_iter.as_str() == "mport" {
+                    TokenType::Import
+                } else {
+                    TokenType::Identifier
+                }
+            },
+            Some('l') => {
+                if local_iter.as_str() == "et" {
+                    TokenType::Let
+                } else {
+                    TokenType::Identifier
+                }
+            },
+            Some('s') => {
+                if local_iter.as_str() == "truct" {
+                    TokenType::Struct
+                } else {
+                    TokenType::Identifier
+                }
+            }
+            Some('p') => {
+                if local_iter.as_str() == "ub" {
+                    TokenType::Pub
+                } else {
+                    TokenType::Identifier
+                }
+            }
+            Some(c) => {
+                if c.is_uppercase() {
+                    TokenType::KIdentifier
+                } else {
+                    TokenType::Identifier
+                }
+            }
+            _ => TokenType::Identifier,
         }
-    }
-
-    fn remaining(iter: &str, remain: &str) -> bool  {
-        iter.starts_with(remain)
     }
 
     fn number(&mut self) -> Token<'a> {

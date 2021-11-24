@@ -38,7 +38,7 @@ pub enum TokenType {
     Equal,
     Import,
     From,
-    Export,
+    Pub,
     Eof,
     Error,
 }
