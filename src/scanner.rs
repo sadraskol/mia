@@ -145,14 +145,14 @@ impl<'a> Scanner<'a> {
                 } else {
                     TokenType::Identifier
                 }
-            },
+            }
             Some('l') => {
                 if local_iter.as_str() == "et" {
                     TokenType::Let
                 } else {
                     TokenType::Identifier
                 }
-            },
+            }
             Some('s') => {
                 if local_iter.as_str() == "truct" {
                     TokenType::Struct
@@ -211,7 +211,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn is_at_end(&self) -> bool {
-        self.current == ""
+        self.current.is_empty()
     }
 
     fn make_token(&mut self, kind: TokenType) -> Token<'a> {

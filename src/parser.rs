@@ -1,19 +1,21 @@
-use std::str::FromStr;
 use crate::token::Token;
 use crate::{Scanner, TokenType};
+use std::str::FromStr;
 
-#[derive(Debug)]
-enum Object {
+#[derive(Clone, Debug)]
+pub enum Object {
     Num(f64),
     String(String),
+    Struct(Vec<(String, Object)>),
+    Array(Vec<Object>),
     None,
 }
 
 #[derive(Debug)]
-struct Field<'a>(Vec<Token<'a>>, Expr<'a>);
+pub struct Field<'a>(pub Vec<Token<'a>>, pub Expr<'a>);
 
 #[derive(Debug)]
-enum Expr<'a> {
+pub enum Expr<'a> {
     Assign(Box<Expr<'a>>, Box<Expr<'a>>),
     Binary(Box<Expr<'a>>, Token<'a>, Box<Expr<'a>>),
     Struct(Token<'a>, Vec<Field<'a>>),
@@ -24,7 +26,7 @@ enum Expr<'a> {
 }
 
 #[derive(Debug)]
-enum Type<'a> {
+pub enum Type<'a> {
     AnonymousStruct(Vec<FieldDeclaration<'a>>),
     Nullable(Box<Type<'a>>),
     Nested(Box<Type<'a>>, Box<Type<'a>>),
@@ -34,10 +36,10 @@ enum Type<'a> {
 }
 
 #[derive(Debug)]
-struct FieldDeclaration<'a>(Vec<Token<'a>>, Type<'a>); // Todo remove vec<Token> for a field and use anonymous struct instead.
+pub struct FieldDeclaration<'a>(Vec<Token<'a>>, Type<'a>); // Todo remove vec<Token> for a field and use anonymous struct instead.
 
 #[derive(Debug)]
-enum Statement<'a> {
+pub enum Statement<'a> {
     For(Token<'a>, Expr<'a>, Box<Statement<'a>>),
     Block(Vec<Statement<'a>>),
     Variable(bool, Token<'a>, Option<Expr<'a>>),
@@ -47,7 +49,7 @@ enum Statement<'a> {
 }
 
 #[derive(Debug)]
-pub struct Program<'a>(Vec<Statement<'a>>);
+pub struct Program<'a>(pub Vec<Statement<'a>>);
 
 pub struct Parser<'a> {
     scanner: Scanner<'a>,
@@ -138,10 +140,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        self.consume(
-            TokenType::RightBrace,
-            "Expect '}' after struct definition.",
-        );
+        self.consume(TokenType::RightBrace, "Expect '}' after struct definition.");
 
         Statement::Struct(public, struct_name, fields)
     }
@@ -154,7 +153,13 @@ impl<'a> Parser<'a> {
 
         if let Some(opening) = self.matches(TokenType::LeftCaret) {
             let nested = self.types();
-            self.consume(TokenType::RightCaret, format!("Expected matching '>' to the '<' at {}:{}", opening.line, opening.col));
+            self.consume(
+                TokenType::RightCaret,
+                format!(
+                    "Expected matching '>' to the '<' at {}:{}",
+                    opening.line, opening.col
+                ),
+            );
             base_type = Type::Nested(Box::new(base_type), Box::new(nested))
         }
 
@@ -203,7 +208,11 @@ impl<'a> Parser<'a> {
             if self.debug {
                 println!("Expected {:?}, got {:?}", kind, self.current.kind);
             }
-            panic!("Error at hello.m:{}: {}", self.current.line, msg.to_string());
+            panic!(
+                "Error at hello.m:{}: {}",
+                self.current.line,
+                msg.to_string()
+            );
         }
     }
 
@@ -241,15 +250,14 @@ impl<'a> Parser<'a> {
         } else if let Some(num) = self.matches(TokenType::Number) {
             Expr::Literal(Object::Num(f64::from_str(num.lexeme).unwrap()))
         } else if let Some(str) = self.matches(TokenType::String) {
-            Expr::Literal(Object::String(str.lexeme.to_string()))
+            Expr::Literal(Object::String(
+                str.lexeme[1..str.lexeme.len() - 1].to_string(),
+            ))
         } else if let Some(token) = self.matches(TokenType::KIdentifier) {
             self.structure(token)
         } else if self.matches(TokenType::LeftParen).is_some() {
             let expr = self.expression();
-            self.consume(
-                TokenType::RightParen,
-                "Expect ')' after expression."
-            );
+            self.consume(TokenType::RightParen, "Expect ')' after expression.");
             Expr::Grouping(Box::new(expr))
         } else if self.matches(TokenType::LeftBracket).is_some() {
             self.consume(TokenType::RightBracket, "Expect ']' after an array.");
@@ -281,7 +289,10 @@ impl<'a> Parser<'a> {
             }
         }
 
-        self.consume(TokenType::RightBrace, "Expect '}' after struct instantiation");
+        self.consume(
+            TokenType::RightBrace,
+            "Expect '}' after struct instantiation",
+        );
         Expr::Struct(token, fields)
     }
 }

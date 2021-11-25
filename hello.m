@@ -9,7 +9,7 @@ pub struct Kube {
 
 let ratio = 0.34;
 
-pub let init = Kube {
+pub let main = Kube {
     name.super: 'Some name',
     comment: 'Comment',
     tags: [],

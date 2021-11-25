@@ -1,25 +1,36 @@
+use crate::formatter::JsonFmt;
 use crate::parser::Parser;
 use crate::scanner::Scanner;
 use crate::token::TokenType;
+use crate::vm::VM;
 use std::env::args;
 
+mod formatter;
 mod parser;
 mod scanner;
 mod token;
+mod vm;
 
 fn main() {
     let mut args = args();
     args.next();
-    run_file(args.next().expect("Usage: rlox [script]"));
+    run_file(args.next().expect("Usage: rlox [script]"), false);
 }
 
-fn run_file(f: String) {
+fn run_file(f: String, debug: bool) {
     let source = std::fs::read_to_string(f).unwrap();
 
-    let mut scanner = Scanner::init(&source, true);
+    let mut scanner = Scanner::init(&source, debug);
 
     let current = scanner.scan_token();
-    let mut parser = Parser::init(scanner, true, current);
+    let mut parser = Parser::init(scanner, debug, current);
 
-    parser.parse();
+    let ast = parser.parse();
+
+    let mut vm = VM::init(debug);
+    if let Some(result) = vm.run(ast) {
+        let formatter = JsonFmt::new();
+        let str = formatter.format(&result);
+        println!("{}", str);
+    }
 }
