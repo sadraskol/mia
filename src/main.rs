@@ -2,9 +2,9 @@ use crate::formatter::JsonFmt;
 use crate::parser::Parser;
 use crate::scanner::Scanner;
 use crate::token::TokenType;
+use crate::type_checker::TypeChecker;
 use crate::vm::VM;
 use std::env::args;
-use crate::type_checker::TypeChecker;
 
 mod formatter;
 mod parser;

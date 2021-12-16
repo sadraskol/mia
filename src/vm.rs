@@ -73,12 +73,10 @@ impl VM {
             Expr::Struct(_, fields) => {
                 let mut pairs = vec![];
                 for field in fields {
-                    pairs.push(
-                        (
-                            QualifiedName(field.0.lexeme.to_string()),
-                            self.run_expression(&field.1)
-                        )
-                    )
+                    pairs.push((
+                        QualifiedName(field.0.lexeme.to_string()),
+                        self.run_expression(&field.1),
+                    ))
                 }
                 Object::Struct(pairs)
             }

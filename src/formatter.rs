@@ -18,7 +18,7 @@ impl JsonFmt {
                 let mut iter = fields.iter().peekable();
                 while let Some(field) = iter.next() {
                     s.push('"');
-                    s.push_str(&field.0.0); // TODO this is not legit
+                    s.push_str(&field.0 .0); // TODO this is not legit
                     s.push('"');
                     s.push(':');
                     s.push_str(&self.format(&field.1));

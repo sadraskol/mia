@@ -71,14 +71,14 @@ impl Type {
             Type::Struct(decls) => {
                 let mut s = "(".to_string();
                 for d in decls {
-                    s.push_str(&d.0.0);
-                    s.push_str(":");
+                    s.push_str(&d.0 .0);
+                    s.push(':');
                     s.push_str(&d.1.print());
-                    s.push_str(",")
+                    s.push(',')
                 }
-                s.push_str(")");
+                s.push(')');
                 s
-            },
+            }
             Type::Nullable(ty) => format!("{}?", ty.print()),
             Type::Nested(ty, nested) => format!("{}<{}>", ty.print(), nested.print()),
             Type::Explicit(name) => name.0.clone(),
@@ -92,10 +92,12 @@ impl Type {
             match self {
                 Type::Infer => true,
                 Type::Nullable(t) => t.can_be_inferred_from(other_ty),
-                Type::Nested(base, n) => if let Type::Nested(other_base, other_n) = other_ty {
-                    base.can_be_inferred_from(other_base) && n.can_be_inferred_from(other_n)
-                } else {
-                    false
+                Type::Nested(base, n) => {
+                    if let Type::Nested(other_base, other_n) = other_ty {
+                        base.can_be_inferred_from(other_base) && n.can_be_inferred_from(other_n)
+                    } else {
+                        false
+                    }
                 }
                 Type::Explicit(_) => false,
                 Type::Builtin(_) => false,
@@ -193,9 +195,14 @@ impl<'a> Parser<'a> {
 
         let mut fields = vec![];
         while self.current.kind != TokenType::RightBracket {
-            let key_name = QualifiedName(self.consume(TokenType::Identifier, "Expect a field declaration.").lexeme.to_string());
+            let key_name = QualifiedName(
+                self.consume(TokenType::Identifier, "Expect a field declaration.")
+                    .lexeme
+                    .to_string(),
+            );
             while self.matches(TokenType::Dot).is_some() {
-                self.consume(TokenType::Identifier, "Expect a nested field declaration."); // TODO BETTER WORK BITCH
+                self.consume(TokenType::Identifier, "Expect a nested field declaration.");
+                // TODO BETTER WORK BITCH
             }
 
             self.consume(TokenType::Colon, "Expect ':' after field declaration.");
@@ -215,10 +222,14 @@ impl<'a> Parser<'a> {
     }
 
     fn types(&mut self) -> Type {
-        let mut base_type = Type::explicit(QualifiedName(self.consume(
-            TokenType::KIdentifier,
-            "Expected types to start with a struct identifier.",
-        ).lexeme.to_string()));
+        let mut base_type = Type::explicit(QualifiedName(
+            self.consume(
+                TokenType::KIdentifier,
+                "Expected types to start with a struct identifier.",
+            )
+            .lexeme
+            .to_string(),
+        ));
 
         if let Some(opening) = self.matches(TokenType::LeftCaret) {
             let nested = self.types();
@@ -343,7 +354,8 @@ impl<'a> Parser<'a> {
         while self.current.kind != TokenType::RightBracket {
             let key_name = self.consume(TokenType::Identifier, "Expect a field declaration.");
             while self.matches(TokenType::Dot).is_some() {
-                self.consume(TokenType::Identifier, "Expect a nested field declaration."); // TODO BE SMART BITCH
+                self.consume(TokenType::Identifier, "Expect a nested field declaration.");
+                // TODO BE SMART BITCH
             }
 
             self.consume(TokenType::Colon, "Expect ':' after field declaration.");
