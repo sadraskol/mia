@@ -1,4 +1,4 @@
-use crate::parser::{Expr, Object, Program, Statement};
+use crate::parser::{Expr, Object, Program, QualifiedName, Statement};
 use crate::token::Token;
 use crate::TokenType;
 
@@ -16,6 +16,9 @@ impl VM {
     }
     pub fn run(&mut self, program: Program) -> Option<Object> {
         for statement in program.0 {
+            if self.debug {
+                println!("[VM] running statement {:?}", statement);
+            }
             match statement {
                 Statement::For(_, _, _) => {}
                 Statement::Block(_) => {}
@@ -70,7 +73,12 @@ impl VM {
             Expr::Struct(_, fields) => {
                 let mut pairs = vec![];
                 for field in fields {
-                    pairs.push((field.0[0].lexeme.to_string(), self.run_expression(&field.1)))
+                    pairs.push(
+                        (
+                            QualifiedName(field.0.lexeme.to_string()),
+                            self.run_expression(&field.1)
+                        )
+                    )
                 }
                 Object::Struct(pairs)
             }
@@ -80,7 +88,7 @@ impl VM {
                 Object::Array(values)
             }
             Expr::Literal(o) => o.clone(),
-            Expr::Variable(_) => self.stack.last().unwrap().clone(),
+            Expr::Variable(_) => self.stack[0].clone(),
         }
     }
 }

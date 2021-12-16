@@ -6,7 +6,7 @@ pub struct Token<'a> {
     pub col: usize,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TokenType {
     RightBracket,
     LeftBracket,

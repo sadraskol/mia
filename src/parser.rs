@@ -6,13 +6,13 @@ use std::str::FromStr;
 pub enum Object {
     Num(f64),
     String(String),
-    Struct(Vec<(String, Object)>),
+    Struct(Vec<(QualifiedName, Object)>),
     Array(Vec<Object>),
     None,
 }
 
 #[derive(Debug)]
-pub struct Field<'a>(pub Vec<Token<'a>>, pub Expr<'a>);
+pub struct Field<'a>(pub Token<'a>, pub Expr<'a>);
 
 #[derive(Debug)]
 pub enum Expr<'a> {
@@ -25,18 +25,90 @@ pub enum Expr<'a> {
     Variable(Token<'a>),
 }
 
-#[derive(Debug)]
-pub enum Type<'a> {
-    AnonymousStruct(Vec<FieldDeclaration<'a>>),
-    Nullable(Box<Type<'a>>),
-    Nested(Box<Type<'a>>, Box<Type<'a>>),
-    Explicit(Token<'a>),
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BuiltinType {
+    Num,
+    String,
+    Array,
+}
+
+impl BuiltinType {
+    pub fn print(&self) -> String {
+        match self {
+            BuiltinType::Num => "Num".to_string(),
+            BuiltinType::String => "String".to_string(),
+            BuiltinType::Array => "Array".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct QualifiedName(pub String);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Type {
+    Struct(Vec<FieldDeclaration>),
+    Nullable(Box<Type>),
+    Nested(Box<Type>, Box<Type>),
+    Explicit(QualifiedName),
     // will always be a token of KIdentifier kind.
+    Builtin(BuiltinType),
     Infer,
 }
 
-#[derive(Debug)]
-pub struct FieldDeclaration<'a>(Vec<Token<'a>>, Type<'a>); // Todo remove vec<Token> for a field and use anonymous struct instead.
+impl Type {
+    pub fn explicit(name: QualifiedName) -> Type {
+        match &*name.0 {
+            "String" => Type::Builtin(BuiltinType::String),
+            "Number" => Type::Builtin(BuiltinType::Num),
+            "Array" => Type::Builtin(BuiltinType::Array),
+            _ => Type::Explicit(name),
+        }
+    }
+
+    pub fn print(&self) -> String {
+        match self {
+            Type::Struct(decls) => {
+                let mut s = "(".to_string();
+                for d in decls {
+                    s.push_str(&d.0.0);
+                    s.push_str(":");
+                    s.push_str(&d.1.print());
+                    s.push_str(",")
+                }
+                s.push_str(")");
+                s
+            },
+            Type::Nullable(ty) => format!("{}?", ty.print()),
+            Type::Nested(ty, nested) => format!("{}<{}>", ty.print(), nested.print()),
+            Type::Explicit(name) => name.0.clone(),
+            Type::Builtin(builtin) => builtin.print(),
+            Type::Infer => "_".to_string(),
+        }
+    }
+
+    pub fn can_be_inferred_from(&self, other_ty: &Type) -> bool {
+        if self != other_ty && other_ty != &Type::Infer {
+            match self {
+                Type::Infer => true,
+                Type::Nullable(t) => t.can_be_inferred_from(other_ty),
+                Type::Nested(base, n) => if let Type::Nested(other_base, other_n) = other_ty {
+                    base.can_be_inferred_from(other_base) && n.can_be_inferred_from(other_n)
+                } else {
+                    false
+                }
+                Type::Explicit(_) => false,
+                Type::Builtin(_) => false,
+                Type::Struct(_) => false,
+            }
+        } else {
+            true
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FieldDeclaration(pub QualifiedName, pub Type); // Todo remove vec<Token> for a field and use anonymous struct instead.
 
 #[derive(Debug)]
 pub enum Statement<'a> {
@@ -44,7 +116,7 @@ pub enum Statement<'a> {
     Block(Vec<Statement<'a>>),
     Variable(bool, Token<'a>, Option<Expr<'a>>),
     Expr(Expr<'a>),
-    Struct(bool, Token<'a>, Vec<FieldDeclaration<'a>>),
+    Struct(bool, Token<'a>, Vec<FieldDeclaration>),
     Import(Token<'a>, Token<'a>),
 }
 
@@ -121,12 +193,9 @@ impl<'a> Parser<'a> {
 
         let mut fields = vec![];
         while self.current.kind != TokenType::RightBracket {
-            let mut key_name =
-                vec![self.consume(TokenType::Identifier, "Expect a field declaration.")];
+            let key_name = QualifiedName(self.consume(TokenType::Identifier, "Expect a field declaration.").lexeme.to_string());
             while self.matches(TokenType::Dot).is_some() {
-                key_name.push(
-                    self.consume(TokenType::Identifier, "Expect a nested field declaration."),
-                );
+                self.consume(TokenType::Identifier, "Expect a nested field declaration."); // TODO BETTER WORK BITCH
             }
 
             self.consume(TokenType::Colon, "Expect ':' after field declaration.");
@@ -145,11 +214,11 @@ impl<'a> Parser<'a> {
         Statement::Struct(public, struct_name, fields)
     }
 
-    fn types(&mut self) -> Type<'a> {
-        let mut base_type = Type::Explicit(self.consume(
+    fn types(&mut self) -> Type {
+        let mut base_type = Type::explicit(QualifiedName(self.consume(
             TokenType::KIdentifier,
             "Expected types to start with a struct identifier.",
-        ));
+        ).lexeme.to_string()));
 
         if let Some(opening) = self.matches(TokenType::LeftCaret) {
             let nested = self.types();
@@ -272,12 +341,9 @@ impl<'a> Parser<'a> {
         let mut fields = vec![];
 
         while self.current.kind != TokenType::RightBracket {
-            let mut key_name =
-                vec![self.consume(TokenType::Identifier, "Expect a field declaration.")];
+            let key_name = self.consume(TokenType::Identifier, "Expect a field declaration.");
             while self.matches(TokenType::Dot).is_some() {
-                key_name.push(
-                    self.consume(TokenType::Identifier, "Expect a nested field declaration."),
-                );
+                self.consume(TokenType::Identifier, "Expect a nested field declaration."); // TODO BE SMART BITCH
             }
 
             self.consume(TokenType::Colon, "Expect ':' after field declaration.");

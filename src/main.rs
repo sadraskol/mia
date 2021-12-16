@@ -4,11 +4,13 @@ use crate::scanner::Scanner;
 use crate::token::TokenType;
 use crate::vm::VM;
 use std::env::args;
+use crate::type_checker::TypeChecker;
 
 mod formatter;
 mod parser;
 mod scanner;
 mod token;
+mod type_checker;
 mod vm;
 
 fn main() {
@@ -26,6 +28,9 @@ fn run_file(f: String, debug: bool) {
     let mut parser = Parser::init(scanner, debug, current);
 
     let ast = parser.parse();
+
+    let mut checker = TypeChecker::init(debug);
+    checker.check(&ast);
 
     let mut vm = VM::init(debug);
     if let Some(result) = vm.run(ast) {
