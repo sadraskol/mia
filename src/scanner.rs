@@ -220,6 +220,7 @@ impl<'a> Scanner<'a> {
             lexeme: &self.current[0..self.offset],
             line: self.line,
             col: self.col,
+            stack_offset: 0,
         };
         self.col = self.col_offset;
         t
@@ -231,6 +232,7 @@ impl<'a> Scanner<'a> {
             lexeme: msg,
             line: self.line,
             col: self.col,
+            stack_offset: 0,
         };
         self.col = self.col_offset;
         t

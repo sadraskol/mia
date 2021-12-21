@@ -1,6 +1,7 @@
 use crate::token::Token;
 use crate::{Scanner, TokenType};
 use std::str::FromStr;
+use crate::compiler::Compiler;
 
 #[derive(Clone, Debug)]
 pub enum Object {
@@ -127,6 +128,7 @@ pub struct Program<'a>(pub Vec<Statement<'a>>);
 
 pub struct Parser<'a> {
     scanner: Scanner<'a>,
+    compiler: Compiler<'a>,
     current: Token<'a>,
     debug: bool,
 }
@@ -135,6 +137,7 @@ impl<'a> Parser<'a> {
     pub fn init(scanner: Scanner<'a>, debug: bool, current: Token<'a>) -> Self {
         Parser {
             scanner,
+            compiler: Compiler::new(),
             current,
             debug,
         }
@@ -252,6 +255,7 @@ impl<'a> Parser<'a> {
 
     fn let_declaration(&mut self, public: bool) -> Statement<'a> {
         let iden = self.consume(TokenType::Identifier, "Expected an identifier.");
+        self.compiler.add_local(iden.clone());
         let init = if self.matches(TokenType::Equal).is_some() {
             Some(self.expression())
         } else {
@@ -325,8 +329,13 @@ impl<'a> Parser<'a> {
     }
 
     fn primary(&mut self) -> Expr<'a> {
-        if let Some(identifier) = self.matches(TokenType::Identifier) {
-            Expr::Variable(identifier)
+        if let Some(mut identifier) = self.matches(TokenType::Identifier) {
+            if let Some(offset) = self.compiler.resolve_local(&identifier) {
+                identifier.stack_offset = offset;
+                Expr::Variable(identifier)
+            } else {
+                panic!("Could not find variable {:?} in context", identifier);
+            }
         } else if let Some(num) = self.matches(TokenType::Number) {
             Expr::Literal(Object::Num(f64::from_str(num.lexeme).unwrap()))
         } else if let Some(str) = self.matches(TokenType::String) {
@@ -340,11 +349,22 @@ impl<'a> Parser<'a> {
             self.consume(TokenType::RightParen, "Expect ')' after expression.");
             Expr::Grouping(Box::new(expr))
         } else if self.matches(TokenType::LeftBracket).is_some() {
-            self.consume(TokenType::RightBracket, "Expect ']' after an array.");
-            Expr::Array(vec![])
+            self.array()
         } else {
             panic!("Expected expression at hello:{}", self.current.line);
         }
+    }
+
+    fn array(&mut self) -> Expr<'a> {
+        let mut exprs = vec![];
+        while self.matches(TokenType::RightBracket).is_none() {
+            exprs.push(self.expression());
+            if self.matches(TokenType::Comma).is_none() {
+                break;
+            }
+        }
+        self.consume(TokenType::RightBracket, "Expect ']' after an array.");
+        Expr::Array(exprs)
     }
 
     fn structure(&mut self, token: Token<'a>) -> Expr<'a> {

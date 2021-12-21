@@ -31,9 +31,12 @@ impl JsonFmt {
             }
             Object::Array(a) => {
                 let mut s = "[".to_string();
-                for o in a {
+                let mut iter = a.iter().peekable();
+                while let Some(o) = iter.next() {
                     s.push_str(&self.format(o));
-                    s.push(',');
+                    if iter.peek().is_some() {
+                        s.push(',');
+                    }
                 }
                 s.push(']');
                 s

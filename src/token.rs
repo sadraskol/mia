@@ -4,6 +4,7 @@ pub struct Token<'a> {
     pub lexeme: &'a str,
     pub line: usize,
     pub col: usize,
+    pub stack_offset: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

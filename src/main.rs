@@ -12,6 +12,7 @@ mod scanner;
 mod token;
 mod type_checker;
 mod vm;
+mod compiler;
 
 fn main() {
     let mut args = args();

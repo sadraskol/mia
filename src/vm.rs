@@ -86,7 +86,9 @@ impl VM {
                 Object::Array(values)
             }
             Expr::Literal(o) => o.clone(),
-            Expr::Variable(_) => self.stack[0].clone(),
+            Expr::Variable(v) => {
+                self.stack[v.stack_offset].clone()
+            },
         }
     }
 }
