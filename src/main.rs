@@ -17,7 +17,7 @@ mod compiler;
 fn main() {
     let mut args = args();
     args.next();
-    run_file(args.next().expect("Usage: rlox [script]"), false);
+    run_file(args.next().expect("Usage: rlox [script]"), true);
 }
 
 fn run_file(f: String, debug: bool) {

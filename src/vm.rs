@@ -20,7 +20,9 @@ impl VM {
                 println!("[VM] running statement {:?}", statement);
             }
             match statement {
+                Statement::Return(_) => {}
                 Statement::For(_, _, _) => {}
+                Statement::Fn(_, _, _, _, _) => {}
                 Statement::Block(_) => {}
                 Statement::Variable(true, Token { lexeme: "main", .. }, None) => {
                     return Some(Object::None);
@@ -47,29 +49,44 @@ impl VM {
 
     fn run_expression(&mut self, expr: &Expr) -> Object {
         match expr {
+            Expr::Call(_, _) => Object::None,
             Expr::Assign(_, _) => Object::None,
             Expr::Binary(
                 left,
                 Token {
-                    kind: TokenType::Star,
+                    kind: op,
                     ..
                 },
                 right,
             ) => {
                 let left = self.run_expression(left);
                 let right = self.run_expression(right);
-
-                if let Object::Num(left) = left {
-                    if let Object::Num(right) = right {
-                        Object::Num(left * right)
-                    } else {
-                        panic!("both values are not numbers");
+                match op {
+                    TokenType::Star => {
+                        if let Object::Num(left) = left {
+                            if let Object::Num(right) = right {
+                                Object::Num(left * right)
+                            } else {
+                                panic!("both values are not numbers");
+                            }
+                        } else {
+                            panic!("both values are not numbers");
+                        }
                     }
-                } else {
-                    panic!("both values are not numbers");
+                    TokenType::Plus => {
+                        if let Object::String(left) = left {
+                            if let Object::String(right) = right {
+                                Object::String(left + &right)
+                            } else {
+                                panic!("both values are not numbers");
+                            }
+                        } else {
+                            panic!("both values are not numbers");
+                        }
+                    }
+                    _ => Object::None
                 }
             }
-            Expr::Binary(_, _, _) => Object::None,
             Expr::Struct(_, fields) => {
                 let mut pairs = vec![];
                 for field in fields {
@@ -88,7 +105,7 @@ impl VM {
             Expr::Literal(o) => o.clone(),
             Expr::Variable(v) => {
                 self.stack[v.stack_offset].clone()
-            },
+            }
         }
     }
 }

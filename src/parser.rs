@@ -17,6 +17,7 @@ pub struct Field<'a>(pub Token<'a>, pub Expr<'a>);
 
 #[derive(Debug)]
 pub enum Expr<'a> {
+    Call(Box<Expr<'a>>, Vec<Expr<'a>>),
     Assign(Box<Expr<'a>>, Box<Expr<'a>>),
     Binary(Box<Expr<'a>>, Token<'a>, Box<Expr<'a>>),
     Struct(Token<'a>, Vec<Field<'a>>),
@@ -28,6 +29,7 @@ pub enum Expr<'a> {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BuiltinType {
+    Unit,
     Num,
     String,
     Array,
@@ -36,6 +38,7 @@ pub enum BuiltinType {
 impl BuiltinType {
     pub fn print(&self) -> String {
         match self {
+            BuiltinType::Unit => "Unit".to_string(),
             BuiltinType::Num => "Num".to_string(),
             BuiltinType::String => "String".to_string(),
             BuiltinType::Array => "Array".to_string(),
@@ -52,6 +55,7 @@ pub enum Type {
     Nullable(Box<Type>),
     Nested(Box<Type>, Box<Type>),
     Explicit(QualifiedName),
+    Fn(Box<Type>),
     // will always be a token of KIdentifier kind.
     Builtin(BuiltinType),
     Infer,
@@ -69,6 +73,9 @@ impl Type {
 
     pub fn print(&self) -> String {
         match self {
+            Type::Fn(ty) => {
+                format!("(): {}", ty.print())
+            }
             Type::Struct(decls) => {
                 let mut s = "(".to_string();
                 for d in decls {
@@ -92,7 +99,13 @@ impl Type {
         if self != other_ty && other_ty != &Type::Infer {
             match self {
                 Type::Infer => true,
-                Type::Nullable(t) => t.can_be_inferred_from(other_ty),
+                Type::Nullable(t) => {
+                    if let Type::Nullable(other_t) = other_ty {
+                        t.can_be_inferred_from(other_t)
+                    } else {
+                        t.can_be_inferred_from(other_ty)
+                    }
+                }
                 Type::Nested(base, n) => {
                     if let Type::Nested(other_base, other_n) = other_ty {
                         base.can_be_inferred_from(other_base) && n.can_be_inferred_from(other_n)
@@ -103,6 +116,7 @@ impl Type {
                 Type::Explicit(_) => false,
                 Type::Builtin(_) => false,
                 Type::Struct(_) => false,
+                Type::Fn(_) => false,
             }
         } else {
             true
@@ -118,9 +132,11 @@ pub enum Statement<'a> {
     For(Token<'a>, Expr<'a>, Box<Statement<'a>>),
     Block(Vec<Statement<'a>>),
     Variable(bool, Token<'a>, Option<Expr<'a>>),
+    Return(Expr<'a>),
     Expr(Expr<'a>),
     Struct(bool, Token<'a>, Vec<FieldDeclaration>),
     Import(Token<'a>, Token<'a>),
+    Fn(bool, Token<'a>, Vec<Token<'a>>, Type, Vec<Statement<'a>>)
 }
 
 #[derive(Debug)]
@@ -182,17 +198,76 @@ impl<'a> Parser<'a> {
             } else {
                 panic!("the following declaration cannot be public.");
             }
+        } else if self.matches(TokenType::Fn).is_some() {
+            self.fn_declaration(false)
         } else if self.matches(TokenType::Import).is_some() {
             self.import_declaration()
         } else if self.matches(TokenType::Struct).is_some() {
             self.struct_declaration(false)
+        } else if self.matches(TokenType::Return).is_some() {
+            self.return_declaration()
         } else {
             self.statement()
         }
     }
 
+    fn return_declaration(&mut self) -> Statement<'a> {
+        let value = self.expression();
+
+        self.consume(
+            TokenType::Semicolon,
+            "Expected a ';' after return",
+        );
+        Statement::Return(value)
+    }
+
+    fn fn_declaration(&mut self, public: bool) -> Statement<'a> {
+        let name = self.consume(TokenType::Identifier, "Expect function name.");
+        self.compiler.add_local(name);
+        self.consume(TokenType::LeftParen, "Expect '(' after function name.");
+
+        let mut args = vec![];
+        while self.matches(TokenType::RightParen).is_none() {
+            let token = self.consume(TokenType::Identifier, "Expect argument name.");
+            args.push(token);
+            self.matches(TokenType::Comma);
+        }
+
+        let return_type = if self.matches(TokenType::Colon).is_some() {
+            self.types()
+        } else {
+            Type::Builtin(BuiltinType::Unit)
+        };
+
+        self.consume(TokenType::LeftBrace, "Expect '{' after function signature.");
+        self.compiler.begin_scope();
+        for tok in &args {
+            self.compiler.add_local(tok.clone());
+        }
+
+        let mut body = vec![];
+        while self.current.kind != TokenType::RightBrace {
+            body.push(self.declaration());
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}' at the end of block declaration.");
+        self.compiler.end_scope();
+        Statement::Fn(public, name, args, return_type,body)
+    }
+
+    fn block_declaration(&mut self) -> Statement<'a> {
+        self.compiler.begin_scope();
+        let mut stmts = vec![];
+        while self.current.kind != TokenType::RightBrace {
+            stmts.push(self.declaration());
+        }
+        self.consume(TokenType::RightBrace, "Expect '}' at the end of block declaration.");
+        self.compiler.end_scope();
+        Statement::Block(stmts)
+    }
+
     fn struct_declaration(&mut self, public: bool) -> Statement<'a> {
-        let struct_name = self.consume(TokenType::KIdentifier, "expect a name after struct.");
+        let struct_name = self.consume(TokenType::KIdentifier, "Expect a name after struct.");
 
         self.consume(TokenType::LeftBrace, "Expect '{' after struct name.");
 
@@ -309,7 +384,7 @@ impl<'a> Parser<'a> {
     }
 
     fn expression(&mut self) -> Expr<'a> {
-        let expr = self.multiply();
+        let expr = self.call();
         if self.matches(TokenType::Equal).is_some() {
             let value = self.expression();
             Expr::Assign(Box::new(expr), Box::new(value))
@@ -318,9 +393,37 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn call(&mut self) -> Expr<'a> {
+        let expr = self.multiply();
+        if self.matches(TokenType::LeftParen).is_some() {
+            let mut args = vec![];
+            while self.current.kind != TokenType::RightParen {
+                args.push(self.expression());
+
+                if self.current.kind != TokenType::RightParen {
+                    self.consume(TokenType::Comma, "Expect ',' between function arguments.");
+                }
+            }
+            self.consume(TokenType::RightParen, "Expect ')' after function arguments.");
+            Expr::Call(Box::new(expr), args)
+        } else {
+            expr
+        }
+    }
+
     fn multiply(&mut self) -> Expr<'a> {
-        let operand = self.primary();
+        let operand = self.add();
         if let Some(op) = self.matches(TokenType::Star) {
+            let value = self.expression();
+            Expr::Binary(Box::new(operand), op, Box::new(value))
+        } else {
+            operand
+        }
+    }
+
+    fn add(&mut self) -> Expr<'a> {
+        let operand = self.primary();
+        if let Some(op) = self.matches(TokenType::Plus) {
             let value = self.expression();
             Expr::Binary(Box::new(operand), op, Box::new(value))
         } else {
@@ -338,6 +441,8 @@ impl<'a> Parser<'a> {
             }
         } else if let Some(num) = self.matches(TokenType::Number) {
             Expr::Literal(Object::Num(f64::from_str(num.lexeme).unwrap()))
+        } else if let Some(_) = self.matches(TokenType::Nil) {
+            Expr::Literal(Object::None)
         } else if let Some(str) = self.matches(TokenType::String) {
             Expr::Literal(Object::String(
                 str.lexeme[1..str.lexeme.len() - 1].to_string(),
@@ -351,7 +456,7 @@ impl<'a> Parser<'a> {
         } else if self.matches(TokenType::LeftBracket).is_some() {
             self.array()
         } else {
-            panic!("Expected expression at hello:{}", self.current.line);
+            panic!("Expected expression at hello.m:{}", self.current.line);
         }
     }
 

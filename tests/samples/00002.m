@@ -15,6 +15,6 @@ let tag_2 = 'tag 2';
 pub let main = Kube {
     name.super: 'Some name',
     comment: comment,
-    tags: [ tag_1, tag_2 ],
-    opt: 123 * ratio
+    tags: [ tag_1, ratio ],
+    opt: nil
 };

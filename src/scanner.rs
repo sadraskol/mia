@@ -127,7 +127,9 @@ impl<'a> Scanner<'a> {
         let mut local_iter = self.current[0..self.offset].chars();
         match local_iter.next() {
             Some('f') => {
-                if local_iter.as_str() == "or" {
+                if local_iter.as_str() == "n" {
+                    TokenType::Fn
+                } else if local_iter.as_str() == "or" {
                     TokenType::For
                 } else if local_iter.as_str() == "rom" {
                     TokenType::From
@@ -163,6 +165,20 @@ impl<'a> Scanner<'a> {
             Some('p') => {
                 if local_iter.as_str() == "ub" {
                     TokenType::Pub
+                } else {
+                    TokenType::Identifier
+                }
+            }
+            Some('n') => {
+                if local_iter.as_str() == "il" {
+                    TokenType::Nil
+                } else {
+                    TokenType::Identifier
+                }
+            }
+            Some('r') => {
+                if local_iter.as_str() == "eturn" {
+                    TokenType::Return
                 } else {
                     TokenType::Identifier
                 }

@@ -48,7 +48,11 @@ impl<'a> TypeChecker<'a> {
             println!("[Type Checker] Statement {:?}", statement);
         }
         match statement {
+            Statement::Return(_) => {}
             Statement::For(_, _, _) => {}
+            Statement::Fn(_, name, _args, ret, _body) => {
+                self.scope.variables.push((*name, Type::Fn(Box::new(ret.clone()))))
+            }
             Statement::Block(statements) => {
                 let new_scope = Scope {
                     enclosing: None,
@@ -88,6 +92,13 @@ impl<'a> TypeChecker<'a> {
             println!("[Type Checker] Expression {:?}", expr);
         }
         let res = match expr {
+            Expr::Call(exp, _) => {
+                if let Type::Fn(ret) = self.check_expression(exp) {
+                    (&*ret).clone()
+                } else {
+                    panic!()
+                }
+            }
             Expr::Assign(_, _) => {
                 panic!()
             }
@@ -113,7 +124,7 @@ impl<'a> TypeChecker<'a> {
                                 field_declaration.1.print(),
                                 field_ty.print()
                             );
-                            panic!("Field {:?} is not of type {:?}", field, field_declaration.1);
+                            std::process::exit(324)
                         }
                     }
                     self.scope.find(token)
@@ -131,7 +142,8 @@ impl<'a> TypeChecker<'a> {
                     } else if ty == Type::Infer {
                         ty = item_ty;
                     } else if ty != item_ty {
-                        panic!("Literal array can only have a single type.");
+                        eprintln!("Literal array can only have a single type");
+                        std::process::exit(231)
                     }
                 }
                 Type::Nested(Box::new(Type::Builtin(BuiltinType::Array)), Box::new(ty))

@@ -20,9 +20,11 @@ The final step is the formatter that turns the object into JSON.
 
 A lot of features remain:
 
+- Correct stack, variable, scopes, etc.
 - for loops
 - user defined functions
 - module import/export
+- enums and adt
 
 ## Tests
 

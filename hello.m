@@ -1,20 +1,18 @@
-import Array from 'Array';
-
-pub struct Kube {
-    name.super: String,
-    comment: String,
-    tags: Array<String>,
-    opt: Number?,
+struct Kube {
+    home: String,
+    public_key: String,
+    private_key: String
 }
 
-let ratio = 0.34;
-let comment = '12312';
-let tag_1 = 'tag 1';
-let tag_2 = 'tag 2';
+fn makeUser(name): Kube {
+    return Kube {
+        home: '/home/' + name,
+        public_key: '/home/' + name + '/.ssh/id_ed25519.pub',
+        private_key: '/home/' + name + '/.ssh/id_ed25519'
+    };
+}
 
-pub let main = Kube {
-    name.super: 'Some name',
-    comment: comment,
-    tags: [ tag_1, tag_2 ],
-    opt: 123 * ratio
-};
+pub let main = [
+    makeUser('bob'),
+    makeUser('alice')
+];
