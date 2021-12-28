@@ -1,111 +1,103 @@
-use crate::parser::{Expr, Object, Program, QualifiedName, Statement};
+use crate::bytecode::{Chunk, Opcode};
+use crate::parser::{Expr, Object, QualifiedName, Statement};
 use crate::token::Token;
 use crate::TokenType;
+use std::collections::HashMap;
+use std::mem::MaybeUninit;
+use std::ops::Deref;
 
 pub struct VM {
     debug: bool,
+    frames: Vec<Frame>,
+}
+
+struct Frame {
+    chunk: Chunk,
+    ip: usize,
+
+    locals: [MaybeUninit<Object>; 256],
     stack: Vec<Object>,
+    fns: HashMap<String, Object>,
+
+    debug: bool,
+}
+
+impl Frame {
+    pub fn init(chunk: Chunk, debug: bool) -> Self {
+        Frame {
+            chunk,
+            ip: 0,
+            locals: unsafe { MaybeUninit::uninit().assume_init() },
+            stack: vec![],
+            fns: HashMap::new(),
+            debug,
+        }
+    }
+
+    fn pop(&mut self) -> Object {
+        self.stack.pop().unwrap()
+    }
+
+    pub fn run(&mut self) -> Object {
+        loop {
+            let op = self.chunk.code[self.ip].clone();
+            self.ip += 1;
+
+            if self.debug {
+                println!("[Frame] executing {:?}", op);
+                println!("[Frame] stack: {:?}", self.stack);
+            }
+
+            match op {
+                Opcode::Pop => {
+                    self.pop();
+                }
+                Opcode::Nil => {
+                    self.stack.push(Object::Nil);
+                }
+                Opcode::Load(i) => {
+                    let val = unsafe { self.locals[i as usize].assume_init_ref() }.clone();
+                    self.stack.push(val);
+                }
+                Opcode::Store(i) => {
+                    let top = self.pop();
+                    self.locals[i as usize] = MaybeUninit::new(top);
+                }
+                Opcode::Constant(i) => self.stack.push(self.chunk.constants[i as usize].clone()),
+                Opcode::Struct(_) => {}
+                Opcode::Array(_) => {}
+                Opcode::Call => {}
+                Opcode::Add => {
+                    let left = self.pop();
+                    let right = self.pop();
+                    self.stack.push(left + right);
+                }
+                Opcode::Multiply => {
+                    let left = self.pop();
+                    let right = self.pop();
+                    self.stack.push(left * right);
+                }
+                Opcode::Return => {
+                    return self.stack[0].clone();
+                }
+            }
+        }
+    }
 }
 
 impl VM {
-    pub fn init(debug: bool) -> Self {
+    pub fn init(chunk: Chunk, debug: bool) -> Self {
         VM {
             debug,
-            stack: vec![],
+            frames: vec![Frame::init(chunk, debug)],
         }
-    }
-    pub fn run(&mut self, program: Program) -> Option<Object> {
-        for statement in program.0 {
-            if self.debug {
-                println!("[VM] running statement {:?}", statement);
-            }
-            match statement {
-                Statement::Return(_) => {}
-                Statement::For(_, _, _) => {}
-                Statement::Fn(_, _, _, _, _) => {}
-                Statement::Block(_) => {}
-                Statement::Variable(true, Token { lexeme: "main", .. }, None) => {
-                    return Some(Object::None);
-                }
-                Statement::Variable(true, Token { lexeme: "main", .. }, Some(expr)) => {
-                    let value = self.run_expression(&expr);
-                    return Some(value);
-                }
-                Statement::Variable(_, _, maybe_expr) => {
-                    let value = if let Some(expr) = maybe_expr {
-                        self.run_expression(&expr)
-                    } else {
-                        Object::None
-                    };
-                    self.stack.push(value)
-                }
-                Statement::Expr(_) => {}
-                Statement::Struct(_, _, _) => {}
-                Statement::Import(_, _) => {}
-            }
-        }
-        None
     }
 
-    fn run_expression(&mut self, expr: &Expr) -> Object {
-        match expr {
-            Expr::Call(_, _) => Object::None,
-            Expr::Assign(_, _) => Object::None,
-            Expr::Binary(
-                left,
-                Token {
-                    kind: op,
-                    ..
-                },
-                right,
-            ) => {
-                let left = self.run_expression(left);
-                let right = self.run_expression(right);
-                match op {
-                    TokenType::Star => {
-                        if let Object::Num(left) = left {
-                            if let Object::Num(right) = right {
-                                Object::Num(left * right)
-                            } else {
-                                panic!("both values are not numbers");
-                            }
-                        } else {
-                            panic!("both values are not numbers");
-                        }
-                    }
-                    TokenType::Plus => {
-                        if let Object::String(left) = left {
-                            if let Object::String(right) = right {
-                                Object::String(left + &right)
-                            } else {
-                                panic!("both values are not numbers");
-                            }
-                        } else {
-                            panic!("both values are not numbers");
-                        }
-                    }
-                    _ => Object::None
-                }
-            }
-            Expr::Struct(_, fields) => {
-                let mut pairs = vec![];
-                for field in fields {
-                    pairs.push((
-                        QualifiedName(field.0.lexeme.to_string()),
-                        self.run_expression(&field.1),
-                    ))
-                }
-                Object::Struct(pairs)
-            }
-            Expr::Grouping(expr) => self.run_expression(expr),
-            Expr::Array(exprs) => {
-                let values = exprs.iter().map(|e| self.run_expression(e)).collect();
-                Object::Array(values)
-            }
-            Expr::Literal(o) => o.clone(),
-            Expr::Variable(v) => {
-                self.stack[v.stack_offset].clone()
-            }
-        }
+    fn frame(&mut self) -> &mut Frame {
+        self.frames.last_mut().unwrap()
+    }
+
+    pub fn run(&mut self) -> Object {
+        self.frame().run()
     }
 }

@@ -41,7 +41,8 @@ impl JsonFmt {
                 s.push(']');
                 s
             }
-            Object::None => "null".to_string(),
+            Object::Nil => "null".to_string(),
+            Object::Function(_, name, _, _) => format!("<fn {}>", name),
         }
     }
 }

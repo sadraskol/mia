@@ -1,3 +1,4 @@
+use crate::bytecode::Chunk;
 use crate::formatter::JsonFmt;
 use crate::parser::Parser;
 use crate::scanner::Scanner;
@@ -6,13 +7,14 @@ use crate::type_checker::TypeChecker;
 use crate::vm::VM;
 use std::env::args;
 
+mod bytecode;
+mod compiler;
 mod formatter;
 mod parser;
 mod scanner;
 mod token;
 mod type_checker;
 mod vm;
-mod compiler;
 
 fn main() {
     let mut args = args();
@@ -33,10 +35,14 @@ fn run_file(f: String, debug: bool) {
     let mut checker = TypeChecker::init(debug);
     checker.check(&ast);
 
-    let mut vm = VM::init(debug);
-    if let Some(result) = vm.run(ast) {
-        let formatter = JsonFmt::new();
-        let str = formatter.format(&result);
-        println!("{}", str);
-    }
+    let mut main = Chunk::init(debug);
+    main.compile(&ast.0);
+
+    let mut vm = VM::init(main, debug);
+    let result = vm.run();
+
+    let formatter = JsonFmt::new();
+    let str = formatter.format(&result);
+
+    println!("{}", str);
 }

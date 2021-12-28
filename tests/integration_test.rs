@@ -16,7 +16,10 @@ fn second_test() {
         .output()
         .unwrap();
     assert_eq!(String::from_utf8(out.stdout).unwrap(), "");
-    assert_eq!(String::from_utf8(out.stderr).unwrap(), "Literal array can only have a single type\n");
+    assert_eq!(
+        String::from_utf8(out.stderr).unwrap(),
+        "Literal array can only have a single type\n"
+    );
 }
 
 #[test]

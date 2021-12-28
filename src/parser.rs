@@ -1,7 +1,8 @@
+use crate::bytecode::Chunk;
 use crate::token::Token;
 use crate::{Scanner, TokenType};
+use std::ops::{Add, Mul};
 use std::str::FromStr;
-use crate::compiler::Compiler;
 
 #[derive(Clone, Debug)]
 pub enum Object {
@@ -9,7 +10,46 @@ pub enum Object {
     String(String),
     Struct(Vec<(QualifiedName, Object)>),
     Array(Vec<Object>),
-    None,
+    Function(u8, String, Chunk, Type),
+    Nil,
+}
+
+impl Add<Object> for Object {
+    type Output = Object;
+
+    fn add(self, rhs: Object) -> Self::Output {
+        if let Object::String(lhs) = self {
+            if let Object::String(rhs) = rhs {
+                Object::String(lhs + &rhs)
+            } else {
+                panic!()
+            }
+        } else if let Object::Num(lhs) = self {
+            if let Object::Num(rhs) = rhs {
+                Object::Num(lhs + rhs)
+            } else {
+                panic!()
+            }
+        } else {
+            panic!()
+        }
+    }
+}
+
+impl Mul<Object> for Object {
+    type Output = Object;
+
+    fn mul(self, rhs: Object) -> Self::Output {
+        if let Object::Num(lhs) = self {
+            if let Object::Num(rhs) = rhs {
+                Object::Num(lhs * rhs)
+            } else {
+                panic!()
+            }
+        } else {
+            panic!()
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -18,7 +58,6 @@ pub struct Field<'a>(pub Token<'a>, pub Expr<'a>);
 #[derive(Debug)]
 pub enum Expr<'a> {
     Call(Box<Expr<'a>>, Vec<Expr<'a>>),
-    Assign(Box<Expr<'a>>, Box<Expr<'a>>),
     Binary(Box<Expr<'a>>, Token<'a>, Box<Expr<'a>>),
     Struct(Token<'a>, Vec<Field<'a>>),
     Grouping(Box<Expr<'a>>),
@@ -129,14 +168,12 @@ pub struct FieldDeclaration(pub QualifiedName, pub Type); // Todo remove vec<Tok
 
 #[derive(Debug)]
 pub enum Statement<'a> {
-    For(Token<'a>, Expr<'a>, Box<Statement<'a>>),
-    Block(Vec<Statement<'a>>),
     Variable(bool, Token<'a>, Option<Expr<'a>>),
     Return(Expr<'a>),
     Expr(Expr<'a>),
     Struct(bool, Token<'a>, Vec<FieldDeclaration>),
     Import(Token<'a>, Token<'a>),
-    Fn(bool, Token<'a>, Vec<Token<'a>>, Type, Vec<Statement<'a>>)
+    Fn(bool, Token<'a>, Vec<Token<'a>>, Type, Vec<Statement<'a>>),
 }
 
 #[derive(Debug)]
@@ -144,7 +181,6 @@ pub struct Program<'a>(pub Vec<Statement<'a>>);
 
 pub struct Parser<'a> {
     scanner: Scanner<'a>,
-    compiler: Compiler<'a>,
     current: Token<'a>,
     debug: bool,
 }
@@ -153,7 +189,6 @@ impl<'a> Parser<'a> {
     pub fn init(scanner: Scanner<'a>, debug: bool, current: Token<'a>) -> Self {
         Parser {
             scanner,
-            compiler: Compiler::new(),
             current,
             debug,
         }
@@ -214,16 +249,12 @@ impl<'a> Parser<'a> {
     fn return_declaration(&mut self) -> Statement<'a> {
         let value = self.expression();
 
-        self.consume(
-            TokenType::Semicolon,
-            "Expected a ';' after return",
-        );
+        self.consume(TokenType::Semicolon, "Expected a ';' after return");
         Statement::Return(value)
     }
 
     fn fn_declaration(&mut self, public: bool) -> Statement<'a> {
         let name = self.consume(TokenType::Identifier, "Expect function name.");
-        self.compiler.add_local(name);
         self.consume(TokenType::LeftParen, "Expect '(' after function name.");
 
         let mut args = vec![];
@@ -240,30 +271,17 @@ impl<'a> Parser<'a> {
         };
 
         self.consume(TokenType::LeftBrace, "Expect '{' after function signature.");
-        self.compiler.begin_scope();
-        for tok in &args {
-            self.compiler.add_local(tok.clone());
-        }
 
         let mut body = vec![];
         while self.current.kind != TokenType::RightBrace {
             body.push(self.declaration());
         }
 
-        self.consume(TokenType::RightBrace, "Expect '}' at the end of block declaration.");
-        self.compiler.end_scope();
-        Statement::Fn(public, name, args, return_type,body)
-    }
-
-    fn block_declaration(&mut self) -> Statement<'a> {
-        self.compiler.begin_scope();
-        let mut stmts = vec![];
-        while self.current.kind != TokenType::RightBrace {
-            stmts.push(self.declaration());
-        }
-        self.consume(TokenType::RightBrace, "Expect '}' at the end of block declaration.");
-        self.compiler.end_scope();
-        Statement::Block(stmts)
+        self.consume(
+            TokenType::RightBrace,
+            "Expect '}' at the end of block declaration.",
+        );
+        Statement::Fn(public, name, args, return_type, body)
     }
 
     fn struct_declaration(&mut self, public: bool) -> Statement<'a> {
@@ -330,7 +348,6 @@ impl<'a> Parser<'a> {
 
     fn let_declaration(&mut self, public: bool) -> Statement<'a> {
         let iden = self.consume(TokenType::Identifier, "Expected an identifier.");
-        self.compiler.add_local(iden.clone());
         let init = if self.matches(TokenType::Equal).is_some() {
             Some(self.expression())
         } else {
@@ -384,16 +401,6 @@ impl<'a> Parser<'a> {
     }
 
     fn expression(&mut self) -> Expr<'a> {
-        let expr = self.call();
-        if self.matches(TokenType::Equal).is_some() {
-            let value = self.expression();
-            Expr::Assign(Box::new(expr), Box::new(value))
-        } else {
-            expr
-        }
-    }
-
-    fn call(&mut self) -> Expr<'a> {
         let expr = self.multiply();
         if self.matches(TokenType::LeftParen).is_some() {
             let mut args = vec![];
@@ -404,7 +411,10 @@ impl<'a> Parser<'a> {
                     self.consume(TokenType::Comma, "Expect ',' between function arguments.");
                 }
             }
-            self.consume(TokenType::RightParen, "Expect ')' after function arguments.");
+            self.consume(
+                TokenType::RightParen,
+                "Expect ')' after function arguments.",
+            );
             Expr::Call(Box::new(expr), args)
         } else {
             expr
@@ -432,17 +442,12 @@ impl<'a> Parser<'a> {
     }
 
     fn primary(&mut self) -> Expr<'a> {
-        if let Some(mut identifier) = self.matches(TokenType::Identifier) {
-            if let Some(offset) = self.compiler.resolve_local(&identifier) {
-                identifier.stack_offset = offset;
-                Expr::Variable(identifier)
-            } else {
-                panic!("Could not find variable {:?} in context", identifier);
-            }
+        if let Some(identifier) = self.matches(TokenType::Identifier) {
+            Expr::Variable(identifier)
         } else if let Some(num) = self.matches(TokenType::Number) {
             Expr::Literal(Object::Num(f64::from_str(num.lexeme).unwrap()))
-        } else if let Some(_) = self.matches(TokenType::Nil) {
-            Expr::Literal(Object::None)
+        } else if self.matches(TokenType::Nil).is_some() {
+            Expr::Literal(Object::Nil)
         } else if let Some(str) = self.matches(TokenType::String) {
             Expr::Literal(Object::String(
                 str.lexeme[1..str.lexeme.len() - 1].to_string(),

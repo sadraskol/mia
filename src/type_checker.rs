@@ -49,25 +49,10 @@ impl<'a> TypeChecker<'a> {
         }
         match statement {
             Statement::Return(_) => {}
-            Statement::For(_, _, _) => {}
-            Statement::Fn(_, name, _args, ret, _body) => {
-                self.scope.variables.push((*name, Type::Fn(Box::new(ret.clone()))))
-            }
-            Statement::Block(statements) => {
-                let new_scope = Scope {
-                    enclosing: None,
-                    variables: vec![],
-                };
-                let enclosing = std::mem::replace(&mut self.scope, new_scope);
-                self.scope.enclosing = Some(Box::new(enclosing));
-
-                for statement in statements {
-                    self.check_statement(statement);
-                }
-
-                let enclosing = self.scope.enclosing.take().unwrap();
-                self.scope = *enclosing;
-            }
+            Statement::Fn(_, name, _args, ret, _body) => self
+                .scope
+                .variables
+                .push((*name, Type::Fn(Box::new(ret.clone())))),
             Statement::Variable(_, token, expr) => {
                 let ty = expr
                     .as_ref()
@@ -98,9 +83,6 @@ impl<'a> TypeChecker<'a> {
                 } else {
                     panic!()
                 }
-            }
-            Expr::Assign(_, _) => {
-                panic!()
             }
             Expr::Binary(left, op, right) => {
                 let left = self.check_expression(left);
@@ -177,7 +159,8 @@ fn object_type(object: &Object) -> Type {
         Object::Array(_) => {
             panic!("Struct should not be instantiated in the type checker")
         }
-        Object::None => Type::Nullable(Box::new(Type::Infer)),
+        Object::Nil => Type::Nullable(Box::new(Type::Infer)),
+        Object::Function(_, _, _, ty) => Type::Fn(Box::new(ty.clone())),
     }
 }
 
