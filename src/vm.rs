@@ -2,7 +2,6 @@ use crate::bytecode::{Chunk, Opcode};
 use crate::parser::{Object, QualifiedName};
 
 pub struct VM {
-    debug: bool,
     frames: Vec<Frame>,
 }
 
@@ -80,7 +79,7 @@ impl Frame {
                 }
                 Opcode::Call => {
                     let fun = self.pop();
-                    if let Object::Function(arity, name, chunk, ret_ty) = fun {
+                    if let Object::Function(arity, name, chunk, _) = fun {
                         let mut args = vec![];
                         for _ in 0..arity {
                             args.push(self.pop());
@@ -124,7 +123,6 @@ impl Frame {
 impl VM {
     pub fn init(chunk: Chunk, debug: bool) -> Self {
         VM {
-            debug,
             frames: vec![Frame::init(chunk, debug)],
         }
     }

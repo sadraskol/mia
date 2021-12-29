@@ -19,10 +19,6 @@ impl Compiler {
         }
     }
 
-    pub fn begin_scope(&mut self) {}
-
-    pub fn end_scope(&mut self) {}
-
     pub fn add_variable(&mut self, token: &Token) -> usize {
         self.locals.push(Local {
             name: token.lexeme.to_string(),
