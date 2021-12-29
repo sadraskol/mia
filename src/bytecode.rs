@@ -1,4 +1,5 @@
 //! The role of the intermediate is to turn the ast into bytecode.
+use crate::bytecode::Opcode::Constant;
 use crate::compiler::Compiler;
 use crate::parser::{Expr, Object, Statement};
 use crate::TokenType;
@@ -94,13 +95,15 @@ impl Chunk {
                     fn_chunk.compiler.add_variable(arg);
                 }
                 fn_chunk.compile(body);
-                self.compiler.add_variable(name);
+                let i = self.compiler.add_variable(name);
                 self.constants.push(Object::Function(
                     args.len() as u8,
                     name.lexeme.to_string(),
                     fn_chunk,
                     ret_ty.clone(),
-                ))
+                ));
+                self.code.push(Constant(self.constants.len() as u32 - 1));
+                self.code.push(Opcode::Store(i as u8))
             }
         }
     }
@@ -115,8 +118,8 @@ impl Chunk {
                 self.code.push(Opcode::Call);
             }
             Expr::Binary(left, op, right) => {
-                self.expression(left);
                 self.expression(right);
+                self.expression(left);
                 match op.kind {
                     TokenType::Plus => self.code.push(Opcode::Add),
                     TokenType::Star => self.code.push(Opcode::Multiply),

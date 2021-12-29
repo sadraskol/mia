@@ -19,7 +19,16 @@ mod vm;
 fn main() {
     let mut args = args();
     args.next();
-    run_file(args.next().expect("Usage: rlox [script]"), false);
+    let mut debug = false;
+    let mut script = None;
+    while let Some(arg) = args.next() {
+        if arg == "-d" {
+            debug = true;
+        } else {
+            script = Some(arg);
+        }
+    }
+    run_file(script.expect("Usage: rlox [script]"), debug);
 }
 
 fn run_file(f: String, debug: bool) {

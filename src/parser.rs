@@ -3,7 +3,6 @@ use crate::token::Token;
 use crate::{Scanner, TokenType};
 use std::ops::{Add, Mul};
 use std::str::FromStr;
-use crate::bytecode::Opcode::Pop;
 
 #[derive(Clone, Debug)]
 pub enum Object {

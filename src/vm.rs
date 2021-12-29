@@ -1,6 +1,5 @@
 use crate::bytecode::{Chunk, Opcode};
 use crate::parser::{Object, QualifiedName};
-use std::collections::HashMap;
 
 pub struct VM {
     debug: bool,
@@ -13,8 +12,8 @@ struct Frame {
 
     locals: Vec<Object>,
     stack: Vec<Object>,
-    fns: HashMap<String, Object>,
 
+    name: String,
     debug: bool,
 }
 
@@ -25,7 +24,7 @@ impl Frame {
             ip: 0,
             locals: vec![],
             stack: vec![],
-            fns: HashMap::new(),
+            name: "main".to_string(),
             debug,
         }
     }
@@ -40,7 +39,7 @@ impl Frame {
             self.ip += 1;
 
             if self.debug {
-                println!("[Frame] executing {:?}", op);
+                println!("[Frame {}] executing {:?}", self.name, op);
             }
 
             match op {
@@ -79,7 +78,26 @@ impl Frame {
                     }
                     self.stack.push(Object::Array(arr))
                 }
-                Opcode::Call => {}
+                Opcode::Call => {
+                    let fun = self.pop();
+                    if let Object::Function(arity, name, chunk, ret_ty) = fun {
+                        let mut args = vec![];
+                        for _ in 0..arity {
+                            args.push(self.pop());
+                        }
+                        let mut frame = Frame {
+                            chunk,
+                            ip: 0,
+                            locals: args,
+                            stack: vec![],
+                            name,
+                            debug: self.debug,
+                        };
+                        self.stack.push(frame.run());
+                    } else {
+                        eprintln!("Could not execute {:?}", fun);
+                    }
+                }
                 Opcode::Add => {
                     let left = self.pop();
                     let right = self.pop();
@@ -96,8 +114,8 @@ impl Frame {
             }
 
             if self.debug {
-                println!("[Frame] stack: {:?}", self.stack);
-                println!("[Frame] locals: {:?}", self.locals);
+                println!("[Frame {}] stack: {:?}", self.name, self.stack);
+                println!("[Frame {}] locals: {:?}", self.name, self.locals);
             }
         }
     }
