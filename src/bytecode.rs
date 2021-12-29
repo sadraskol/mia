@@ -12,7 +12,7 @@ pub enum Opcode {
     /// From the stack to the locals
     Store(u8),
     Constant(u32),
-    Struct(String),
+    Struct(u32),
     Array(u32),
     Call,
     Add,
@@ -70,11 +70,12 @@ impl Chunk {
                 } else {
                     self.code.push(Opcode::Nil);
                 }
-                let i = self.compiler.add_variable(name);
-                self.code.push(Opcode::Store(i as u8));
 
                 if *exported && "main" == name.lexeme {
                     self.code.push(Opcode::Return);
+                } else {
+                    let i = self.compiler.add_variable(name);
+                    self.code.push(Opcode::Store(i as u8));
                 }
             }
             Statement::Return(expr) => {
@@ -122,20 +123,20 @@ impl Chunk {
                     _ => {}
                 }
             }
-            Expr::Struct(name, fields) => {
-                for f in fields {
+            Expr::Struct(_name, fields) => {
+                for f in fields.iter().rev() {
                     self.expression(&f.1);
                     self.constants.push(Object::String(f.0.lexeme.to_string()));
                     self.code
                         .push(Opcode::Constant(self.constants.len() as u32 - 1))
                 }
-                self.code.push(Opcode::Struct(name.lexeme.to_string()));
+                self.code.push(Opcode::Struct(fields.len() as u32));
             }
             Expr::Grouping(expr) => {
                 self.expression(expr);
             }
             Expr::Array(values) => {
-                for val in values {
+                for val in values.iter().rev() {
                     self.expression(val);
                 }
                 self.code.push(Opcode::Array(values.len() as u32));

@@ -1,10 +1,6 @@
 use crate::bytecode::{Chunk, Opcode};
-use crate::parser::{Expr, Object, QualifiedName, Statement};
-use crate::token::Token;
-use crate::TokenType;
+use crate::parser::{Object, QualifiedName};
 use std::collections::HashMap;
-use std::mem::MaybeUninit;
-use std::ops::Deref;
 
 pub struct VM {
     debug: bool,
@@ -15,7 +11,7 @@ struct Frame {
     chunk: Chunk,
     ip: usize,
 
-    locals: [MaybeUninit<Object>; 256],
+    locals: Vec<Object>,
     stack: Vec<Object>,
     fns: HashMap<String, Object>,
 
@@ -27,7 +23,7 @@ impl Frame {
         Frame {
             chunk,
             ip: 0,
-            locals: unsafe { MaybeUninit::uninit().assume_init() },
+            locals: vec![],
             stack: vec![],
             fns: HashMap::new(),
             debug,
@@ -45,7 +41,6 @@ impl Frame {
 
             if self.debug {
                 println!("[Frame] executing {:?}", op);
-                println!("[Frame] stack: {:?}", self.stack);
             }
 
             match op {
@@ -56,16 +51,34 @@ impl Frame {
                     self.stack.push(Object::Nil);
                 }
                 Opcode::Load(i) => {
-                    let val = unsafe { self.locals[i as usize].assume_init_ref() }.clone();
+                    let val = self.locals[i as usize].clone();
                     self.stack.push(val);
                 }
                 Opcode::Store(i) => {
                     let top = self.pop();
-                    self.locals[i as usize] = MaybeUninit::new(top);
+                    if self.locals.len() <= i as usize {
+                        self.locals.push(top);
+                    } else {
+                        self.locals[i as usize] = top;
+                    }
                 }
                 Opcode::Constant(i) => self.stack.push(self.chunk.constants[i as usize].clone()),
-                Opcode::Struct(_) => {}
-                Opcode::Array(_) => {}
+                Opcode::Struct(s) => {
+                    let mut fields = vec![];
+                    for _ in 0..s {
+                        let field = self.pop();
+                        let val = self.pop();
+                        fields.push((QualifiedName(field.as_str()), val));
+                    }
+                    self.stack.push(Object::Struct(fields))
+                }
+                Opcode::Array(s) => {
+                    let mut arr = vec![];
+                    for _ in 0..s {
+                        arr.push(self.pop());
+                    }
+                    self.stack.push(Object::Array(arr))
+                }
                 Opcode::Call => {}
                 Opcode::Add => {
                     let left = self.pop();
@@ -80,6 +93,11 @@ impl Frame {
                 Opcode::Return => {
                     return self.stack[0].clone();
                 }
+            }
+
+            if self.debug {
+                println!("[Frame] stack: {:?}", self.stack);
+                println!("[Frame] locals: {:?}", self.locals);
             }
         }
     }

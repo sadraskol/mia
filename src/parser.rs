@@ -3,6 +3,7 @@ use crate::token::Token;
 use crate::{Scanner, TokenType};
 use std::ops::{Add, Mul};
 use std::str::FromStr;
+use crate::bytecode::Opcode::Pop;
 
 #[derive(Clone, Debug)]
 pub enum Object {
@@ -46,6 +47,16 @@ impl Mul<Object> for Object {
             } else {
                 panic!()
             }
+        } else {
+            panic!()
+        }
+    }
+}
+
+impl Object {
+    pub fn as_str(&self) -> String {
+        if let Object::String(s) = self {
+            s.clone()
         } else {
             panic!()
         }
