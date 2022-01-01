@@ -91,7 +91,7 @@ impl Chunk {
             Statement::Import(_, _) => {}
             Statement::Fn(_, name, args, ret_ty, body) => {
                 let mut fn_chunk = self.enclosed_chunk();
-                for arg in args {
+                for (arg, _ty) in args {
                     fn_chunk.compiler.add_variable(arg);
                 }
                 fn_chunk.compile(body);

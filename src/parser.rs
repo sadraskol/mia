@@ -183,7 +183,7 @@ pub enum Statement<'a> {
     Expr(Expr<'a>),
     Struct(bool, Token<'a>, Vec<FieldDeclaration>),
     Import(Token<'a>, Token<'a>),
-    Fn(bool, Token<'a>, Vec<Token<'a>>, Type, Vec<Statement<'a>>),
+    Fn(bool, Token<'a>, Vec<(Token<'a>, Type)>, Type, Vec<Statement<'a>>),
 }
 
 #[derive(Debug)]
@@ -270,7 +270,9 @@ impl<'a> Parser<'a> {
         let mut args = vec![];
         while self.matches(TokenType::RightParen).is_none() {
             let token = self.consume(TokenType::Identifier, "Expect argument name.");
-            args.push(token);
+            self.consume(TokenType::Colon, "Expect ':' after argument name.");
+            let ty = self.types();
+            args.push((token, ty));
             self.matches(TokenType::Comma);
         }
 

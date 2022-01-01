@@ -4,7 +4,9 @@ struct Kube {
     private_key: String
 }
 
-fn makeUser(name): Kube {
+let users = ['bob', 'alice'];
+
+fn makeUser(name: String): Kube {
     return Kube {
         home: '/home/' + name,
         public_key: '/home/' + name + '/.ssh/id_ed25519.pub',
@@ -12,7 +14,6 @@ fn makeUser(name): Kube {
     };
 }
 
-pub let main = [
-    makeUser('bob'),
-    makeUser('alice')
-];
+pub let main = map user in users {
+    return makeUser(user);
+};

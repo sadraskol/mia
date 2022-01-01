@@ -4,7 +4,7 @@ struct Kube {
     private_key: String
 }
 
-fn makeUser(name): Kube {
+fn makeUser(name: String): Kube {
     return Kube {
         home: '/home/' + name,
         public_key: '/home/' + name + '/.ssh/id_ed25519.pub',
